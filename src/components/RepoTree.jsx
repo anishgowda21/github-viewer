@@ -98,57 +98,48 @@ const RepoTree = ({ owner, repo, onClose }) => {
     setExpandAllFolders(!expandAllFolders)
   }
 
-  const generateTreeLineText = (items, prefix = "", isLast = true, isRoot = true) => {
-    let result = ""
-    
-    if (!isRoot) {
-      // Add the current item's prefix
-      result = prefix + (isLast ? "└── " : "├── ")
-    } else {
-      // Root level just adds the "." character
-      result = ".\n"
+  // Improved tree structure generation with proper hierarchy and line indicators
+  const generateTreeStructure = (items) => {
+    // A more robust approach to generate the tree structure
+    const buildTreeText = (nodes, prefix = "", isLast = true) => {
+      if (nodes.length === 0) return ""
+      
+      let result = ""
+      
+      // Sort nodes: folders first, then files, alphabetically
+      const sortedNodes = [...nodes].sort((a, b) => {
+        if (a.type === 'tree' && b.type !== 'tree') return -1
+        if (a.type !== 'tree' && b.type === 'tree') return 1
+        return a.name.localeCompare(b.name)
+      })
+      
+      sortedNodes.forEach((node, index) => {
+        const isNodeLast = index === sortedNodes.length - 1
+        const nodePrefix = isNodeLast ? "└── " : "├── "
+        const nodeIcon = node.type === 'tree' ? "📁 " : "📄 "
+        
+        // Add this node to the result
+        result += `${prefix}${nodePrefix}${nodeIcon}${node.name}\n`
+        
+        // If this is a folder with children, process its children
+        if (node.type === 'tree' && node.children && node.children.length > 0) {
+          // Prepare prefix for children
+          const childPrefix = prefix + (isNodeLast ? "    " : "│   ")
+          
+          // Process children
+          result += buildTreeText(node.children, childPrefix, false)
+        }
+      })
+      
+      return result
     }
     
-    // Sort items: folders first, then files, both alphabetically
-    const sortedItems = [...items].sort((a, b) => {
-      if (a.type === 'tree' && b.type !== 'tree') return -1
-      if (a.type !== 'tree' && b.type === 'tree') return 1
-      return a.name.localeCompare(b.name)
-    })
-    
-    // Process each item
-    sortedItems.forEach((item, index) => {
-      // Check if this is the last item of its siblings
-      const itemIsLast = index === sortedItems.length - 1
-      
-      if (!isRoot) {
-        // Add this item
-        result += `📁 ${item.name}\n` 
-      }
-      
-      // Prepare the prefix for children
-      const childPrefix = prefix + (isLast ? "    " : "│   ")
-      
-      // If it's a folder with children, process them
-      if (item.type === 'tree' && item.children?.length > 0) {
-        const childResult = generateTreeLineText(
-          item.children,
-          isRoot ? "" : childPrefix,
-          false,
-          false
-        )
-        result += childResult
-      } else if (item.type !== 'tree') {
-        // It's a file
-        result += `${prefix}${itemIsLast ? "└── " : "├── "}📄 ${item.name}\n`
-      }
-    })
-    
-    return result
+    // Start with the root marker
+    return ".\n" + buildTreeText(items, "", false)
   }
 
   const copyTreeToClipboard = () => {
-    // Generate tree structure with connecting lines
+    // Sort tree data: folders first, then files, alphabetically
     const sortedTreeData = [...treeData].sort((a, b) => {
       if (a.type === 'tree' && b.type !== 'tree') return -1
       if (a.type !== 'tree' && b.type === 'tree') return 1
@@ -156,7 +147,7 @@ const RepoTree = ({ owner, repo, onClose }) => {
     })
     
     const repoTitle = `# ${owner}/${repo}\n\n`
-    const treeText = generateTreeLineText(sortedTreeData)
+    const treeText = generateTreeStructure(sortedTreeData)
     const fullText = repoTitle + treeText
 
     // Copy to clipboard
