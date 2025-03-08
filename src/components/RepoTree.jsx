@@ -39,12 +39,12 @@ const RepoTree = ({ owner, repo, onClose }) => {
 
   // Handle expandAllFolders change
   useEffect(() => {
-    if (treeData.length > 0 && expandAllFolders) {
+    if (treeData.length > 0) {
       // Find all folders in the tree recursively
       const findAllFolders = (items, result = {}) => {
         items.forEach(item => {
           if (item.type === 'tree') {
-            result[item.path] = true
+            result[item.path] = expandAllFolders // Set to true or false based on expandAllFolders toggle
             if (item.children && item.children.length > 0) {
               findAllFolders(item.children, result)
             }
@@ -53,7 +53,7 @@ const RepoTree = ({ owner, repo, onClose }) => {
         return result
       }
       
-      setExpandedFolders(findAllFolders(treeData))
+      setExpandedFolders(findAllFolders(treeData, {}))
     }
   }, [expandAllFolders, treeData])
 
@@ -98,32 +98,65 @@ const RepoTree = ({ owner, repo, onClose }) => {
     setExpandAllFolders(!expandAllFolders)
   }
 
-  const copyTreeToClipboard = () => {
-    // Generate plain text representation of the tree
-    const generateTextTree = (items, level = 0) => {
-      return items
-        .sort((a, b) => {
-          // Folders first, then files, both alphabetically
-          if (a.type === 'tree' && b.type !== 'tree') return -1
-          if (a.type !== 'tree' && b.type === 'tree') return 1
-          return a.name.localeCompare(b.name)
-        })
-        .map(item => {
-          const prefix = '  '.repeat(level)
-          const icon = item.type === 'tree' ? '📁 ' : '📄 '
-          let result = `${prefix}${icon}${item.name}\n`
-          
-          if (item.type === 'tree' && item.children?.length > 0) {
-            result += generateTextTree(item.children, level + 1)
-          }
-          
-          return result
-        })
-        .join('')
+  const generateTreeLineText = (items, prefix = "", isLast = true, isRoot = true) => {
+    let result = ""
+    
+    if (!isRoot) {
+      // Add the current item's prefix
+      result = prefix + (isLast ? "└── " : "├── ")
+    } else {
+      // Root level just adds the "." character
+      result = ".\n"
     }
+    
+    // Sort items: folders first, then files, both alphabetically
+    const sortedItems = [...items].sort((a, b) => {
+      if (a.type === 'tree' && b.type !== 'tree') return -1
+      if (a.type !== 'tree' && b.type === 'tree') return 1
+      return a.name.localeCompare(b.name)
+    })
+    
+    // Process each item
+    sortedItems.forEach((item, index) => {
+      // Check if this is the last item of its siblings
+      const itemIsLast = index === sortedItems.length - 1
+      
+      if (!isRoot) {
+        // Add this item
+        result += `📁 ${item.name}\n` 
+      }
+      
+      // Prepare the prefix for children
+      const childPrefix = prefix + (isLast ? "    " : "│   ")
+      
+      // If it's a folder with children, process them
+      if (item.type === 'tree' && item.children?.length > 0) {
+        const childResult = generateTreeLineText(
+          item.children,
+          isRoot ? "" : childPrefix,
+          false,
+          false
+        )
+        result += childResult
+      } else if (item.type !== 'tree') {
+        // It's a file
+        result += `${prefix}${itemIsLast ? "└── " : "├── "}📄 ${item.name}\n`
+      }
+    })
+    
+    return result
+  }
 
+  const copyTreeToClipboard = () => {
+    // Generate tree structure with connecting lines
+    const sortedTreeData = [...treeData].sort((a, b) => {
+      if (a.type === 'tree' && b.type !== 'tree') return -1
+      if (a.type !== 'tree' && b.type === 'tree') return 1
+      return a.name.localeCompare(b.name)
+    })
+    
     const repoTitle = `# ${owner}/${repo}\n\n`
-    const treeText = generateTextTree(treeData)
+    const treeText = generateTreeLineText(sortedTreeData)
     const fullText = repoTitle + treeText
 
     // Copy to clipboard
