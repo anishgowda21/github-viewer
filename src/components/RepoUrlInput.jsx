@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import RepoTree from './RepoTree'
 
-const RepoUrlInput = () => {
+const RepoUrlInput = ({ onRepoSelect, hideTree = false }) => {
   const [url, setUrl] = useState('')
   const [repoInfo, setRepoInfo] = useState(null)
   const [error, setError] = useState(null)
@@ -11,7 +11,6 @@ const RepoUrlInput = () => {
     
     // Reset
     setError(null)
-    setRepoInfo(null)
     
     try {
       // Parse GitHub URL to extract owner and repo
@@ -31,6 +30,13 @@ const RepoUrlInput = () => {
       repo = repo.split('#')[0]
       repo = repo.split('?')[0]
       
+      // If we have a callback for navigation, use it
+      if (onRepoSelect && typeof onRepoSelect === 'function') {
+        onRepoSelect(owner, repo)
+        return
+      }
+      
+      // Otherwise show tree in the current view
       setRepoInfo({ owner, repo })
     } catch (err) {
       setError('Failed to parse GitHub URL. Please enter a valid repository URL.')
@@ -43,12 +49,16 @@ const RepoUrlInput = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b bg-gray-50">
-          <h3 className="text-lg font-semibold mb-2">View Repository Files</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Enter a GitHub repository URL to view its file structure.
-          </p>
+      <div className={!hideTree ? "bg-white rounded-lg shadow-md overflow-hidden" : ""}>
+        <div className={!hideTree ? "p-4 border-b bg-gray-50" : ""}>
+          {!hideTree && (
+            <>
+              <h3 className="text-lg font-semibold mb-2">View Repository Files</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter a GitHub repository URL to view its file structure.
+              </p>
+            </>
+          )}
           
           <form onSubmit={handleSubmit} className="flex">
             <input
@@ -75,7 +85,7 @@ const RepoUrlInput = () => {
         </div>
       </div>
       
-      {repoInfo && (
+      {repoInfo && !hideTree && (
         <RepoTree 
           owner={repoInfo.owner} 
           repo={repoInfo.repo} 

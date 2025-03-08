@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-const SearchForm = ({ onSearch }) => {
-  const [inputValue, setInputValue] = useState('')
+const SearchForm = ({ onSearch, initialValue = '' }) => {
+  const [inputValue, setInputValue] = useState(initialValue)
+
+  // Update input value when initialValue prop changes
+  useEffect(() => {
+    setInputValue(initialValue)
+  }, [initialValue])
 
   const handleSubmit = (e) => {
     e.preventDefault()
