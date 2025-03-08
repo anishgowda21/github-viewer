@@ -6,6 +6,8 @@ const RepoTree = ({ owner, repo, onClose }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expandedFolders, setExpandedFolders] = useState({})
+  const [copySuccess, setCopySuccess] = useState(false)
+  const [expandAllFolders, setExpandAllFolders] = useState(false)
 
   useEffect(() => {
     const fetchRepoTree = async () => {
@@ -34,6 +36,26 @@ const RepoTree = ({ owner, repo, onClose }) => {
       fetchRepoTree()
     }
   }, [owner, repo])
+
+  // Handle expandAllFolders change
+  useEffect(() => {
+    if (treeData.length > 0 && expandAllFolders) {
+      // Find all folders in the tree recursively
+      const findAllFolders = (items, result = {}) => {
+        items.forEach(item => {
+          if (item.type === 'tree') {
+            result[item.path] = true
+            if (item.children && item.children.length > 0) {
+              findAllFolders(item.children, result)
+            }
+          }
+        })
+        return result
+      }
+      
+      setExpandedFolders(findAllFolders(treeData))
+    }
+  }, [expandAllFolders, treeData])
 
   const processTreeData = (treeItems) => {
     // Create a nested tree structure from flat GitHub API response
@@ -70,6 +92,49 @@ const RepoTree = ({ owner, repo, onClose }) => {
       ...prev,
       [path]: !prev[path]
     }))
+  }
+
+  const toggleExpandAll = () => {
+    setExpandAllFolders(!expandAllFolders)
+  }
+
+  const copyTreeToClipboard = () => {
+    // Generate plain text representation of the tree
+    const generateTextTree = (items, level = 0) => {
+      return items
+        .sort((a, b) => {
+          // Folders first, then files, both alphabetically
+          if (a.type === 'tree' && b.type !== 'tree') return -1
+          if (a.type !== 'tree' && b.type === 'tree') return 1
+          return a.name.localeCompare(b.name)
+        })
+        .map(item => {
+          const prefix = '  '.repeat(level)
+          const icon = item.type === 'tree' ? '📁 ' : '📄 '
+          let result = `${prefix}${icon}${item.name}\n`
+          
+          if (item.type === 'tree' && item.children?.length > 0) {
+            result += generateTextTree(item.children, level + 1)
+          }
+          
+          return result
+        })
+        .join('')
+    }
+
+    const repoTitle = `# ${owner}/${repo}\n\n`
+    const treeText = generateTextTree(treeData)
+    const fullText = repoTitle + treeText
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(fullText)
+      .then(() => {
+        setCopySuccess(true)
+        setTimeout(() => setCopySuccess(false), 2000)
+      })
+      .catch((err) => {
+        console.error('Failed to copy text: ', err)
+      })
   }
 
   const renderTreeItem = (item, indent = 0) => {
@@ -121,14 +186,54 @@ const RepoTree = ({ owner, repo, onClose }) => {
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-4 border-b flex justify-between items-center bg-gray-50">
         <h3 className="text-lg font-semibold">{owner}/{repo} File Structure</h3>
-        <button 
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        </button>
+        <div className="flex items-center space-x-2">
+          <div className={`transition-opacity duration-300 ${copySuccess ? 'opacity-100' : 'opacity-0'}`}>
+            <span className="text-green-600 text-sm">Copied to clipboard!</span>
+          </div>
+          <button 
+            onClick={toggleExpandAll}
+            className="text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded px-3 py-1 text-sm flex items-center"
+            title={expandAllFolders ? "Collapse all folders" : "Expand all folders"}
+          >
+            {expandAllFolders ? (
+              <>
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                </svg>
+                Collapse
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M10 5a1 1 0 011 1v8a1 1 0 11-2 0V6a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                Expand
+              </>
+            )}
+          </button>
+          <button 
+            onClick={copyTreeToClipboard}
+            className="text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded px-3 py-1 text-sm flex items-center"
+            title="Copy tree to clipboard"
+            disabled={loading || error || treeData.length === 0}
+          >
+            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+              <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+            </svg>
+            Copy
+          </button>
+          <button 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+            title="Close"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
       </div>
       
       <div className="p-2 h-96 overflow-y-auto">
