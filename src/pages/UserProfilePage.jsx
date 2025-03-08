@@ -1,9 +1,25 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
-import debounce from 'lodash/debounce'
 import UserProfile from '../components/UserProfile'
 import SearchForm from '../components/SearchForm'
+
+// Custom debounce implementation
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 const UserProfilePage = () => {
   const navigate = useNavigate()
@@ -16,6 +32,18 @@ const UserProfilePage = () => {
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
+  
+  // Use our custom debounce hook
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  
+  // Effect for search loading indicator
+  useEffect(() => {
+    if (searchTerm !== debouncedSearchTerm) {
+      setSearchLoading(true);
+    } else {
+      setSearchLoading(false);
+    }
+  }, [searchTerm, debouncedSearchTerm]);
   
   const fetchUserData = async (username) => {
     if (!username.trim()) return
@@ -43,27 +71,17 @@ const UserProfilePage = () => {
     }
   }
   
-  // Debounced search function for repositories
-  const debouncedSearch = useCallback(
-    debounce((term) => {
-      setSearchLoading(false)
-    }, 300),
-    []
-  )
-  
   // Handle search input change
   const handleSearchChange = (e) => {
     const value = e.target.value
     setSearchTerm(value)
-    setSearchLoading(true)
-    debouncedSearch(value)
   }
   
-  // Filter repositories based on search term
+  // Filter repositories based on debounced search term
   const filteredRepos = repos.filter(repo => {
-    if (!searchTerm) return true
+    if (!debouncedSearchTerm) return true
     
-    const searchLower = searchTerm.toLowerCase()
+    const searchLower = debouncedSearchTerm.toLowerCase()
     return (
       repo.name.toLowerCase().includes(searchLower) ||
       (repo.description && repo.description.toLowerCase().includes(searchLower)) ||
