@@ -32,6 +32,10 @@ const UserProfilePage = () => {
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
+  const [showAllRepos, setShowAllRepos] = useState(false)
+  
+  // Initial display limit
+  const initialReposLimit = 6;
   
   // Use our custom debounce hook
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -59,6 +63,7 @@ const UserProfilePage = () => {
       
       setUser(userResponse.data)
       setRepos(reposResponse.data)
+      setShowAllRepos(false) // Reset when loading new user
       
       // Update URL without reloading the page
       navigate(`/user/${username}`, { replace: true })
@@ -75,6 +80,16 @@ const UserProfilePage = () => {
   const handleSearchChange = (e) => {
     const value = e.target.value
     setSearchTerm(value)
+    
+    // If user starts searching, show all repos
+    if (value) {
+      setShowAllRepos(true)
+    }
+  }
+  
+  // Toggle showing all repositories
+  const toggleShowAllRepos = () => {
+    setShowAllRepos(prev => !prev)
   }
   
   // Filter repositories based on debounced search term
@@ -88,6 +103,9 @@ const UserProfilePage = () => {
       (repo.language && repo.language.toLowerCase().includes(searchLower))
     )
   })
+  
+  // Determine which repos to display
+  const displayRepos = searchTerm ? filteredRepos : showAllRepos ? repos : repos.slice(0, initialReposLimit)
   
   const handleUserSearch = (newUsername) => {
     setUsername(newUsername)
@@ -145,15 +163,25 @@ const UserProfilePage = () => {
             </div>
             <div className="md:col-span-2">
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 border-b flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Repositories ({repos.length})</h3>
+                <div className="p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Repositories ({repos.length})</h3>
+                    {repos.length > initialReposLimit && !searchTerm && (
+                      <button 
+                        onClick={toggleShowAllRepos}
+                        className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium focus:outline-none"
+                      >
+                        {showAllRepos ? 'Show less' : `Show all (${repos.length})`}
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <input
                       type="text"
                       placeholder="Search repositories..."
                       value={searchTerm}
                       onChange={handleSearchChange}
-                      className="pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                      className="pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
                     />
                     <svg className="w-5 h-5 text-gray-400 absolute left-2 top-2.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -166,13 +194,13 @@ const UserProfilePage = () => {
                   </div>
                 </div>
                 
-                {filteredRepos.length === 0 ? (
+                {displayRepos.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     {searchTerm ? 'No repositories match your search.' : 'No repositories found.'}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                    {filteredRepos.map(repo => (
+                    {displayRepos.map(repo => (
                       <div 
                         key={repo.id} 
                         className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 cursor-pointer"
@@ -241,6 +269,18 @@ const UserProfilePage = () => {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+                
+                {/* Show message about limited display when needed */}
+                {!searchTerm && !showAllRepos && repos.length > initialReposLimit && (
+                  <div className="px-4 py-3 bg-gray-50 text-center">
+                    <button 
+                      onClick={toggleShowAllRepos}
+                      className="text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
+                    >
+                      Show all {repos.length} repositories
+                    </button>
                   </div>
                 )}
               </div>
