@@ -1,4 +1,9 @@
 const UserProfile = ({ user }) => {
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric' }
+    return new Date(dateString).toLocaleDateString(undefined, options)
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-4">
@@ -15,19 +20,30 @@ const UserProfile = ({ user }) => {
           <p className="text-gray-700 mb-4">{user.bio}</p>
         )}
         
-        <div className="flex space-x-4 text-sm mb-4">
-          <div>
-            <span className="font-semibold">{user.followers}</span> followers
+        {/* User stats */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="bg-gray-50 p-2 rounded text-center">
+            <div className="text-lg font-semibold">{user.followers}</div>
+            <div className="text-xs text-gray-600">Followers</div>
           </div>
-          <div>
-            <span className="font-semibold">{user.following}</span> following
+          <div className="bg-gray-50 p-2 rounded text-center">
+            <div className="text-lg font-semibold">{user.following}</div>
+            <div className="text-xs text-gray-600">Following</div>
+          </div>
+          <div className="bg-gray-50 p-2 rounded text-center">
+            <div className="text-lg font-semibold">{user.public_repos}</div>
+            <div className="text-xs text-gray-600">Repositories</div>
+          </div>
+          <div className="bg-gray-50 p-2 rounded text-center">
+            <div className="text-lg font-semibold">{user.public_gists || 0}</div>
+            <div className="text-xs text-gray-600">Gists</div>
           </div>
         </div>
         
         <div className="space-y-2 text-sm">
           {user.company && (
             <div className="flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 16 16">
+              <svg className="w-4 h-4 mr-2 text-gray-600" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M5.5 3.5a2 2 0 10-4 0V4h4v-.5zM10 7h1a2 2 0 011.732 1H10V7zm-4 0v1H2.732A2 2 0 014 7h2zm-.5 3c0 1.11-.89 2-2 2-1.11 0-2-.89-2-2H6v-1H1c0 2.21 1.79 4 4 4s4-1.79 4-4h-3.5zM0 4.5A3.5 3.5 0 013.5 1h9a3.5 3.5 0 013.5 3.5v7a3.5 3.5 0 01-3.5 3.5h-9A3.5 3.5 0 010 11.5v-7z"/>
               </svg>
               {user.company}
@@ -36,7 +52,7 @@ const UserProfile = ({ user }) => {
           
           {user.location && (
             <div className="flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 16 16">
+              <svg className="w-4 h-4 mr-2 text-gray-600" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M8 0a5 5 0 00-5 5c0 2.761 2.239 5 5 5s5-2.239 5-5c0-2.761-2.239-5-5-5zm0 7.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/>
                 <path d="M8 10a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
               </svg>
@@ -46,16 +62,15 @@ const UserProfile = ({ user }) => {
           
           {user.blog && (
             <div className="flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M4.715 6.542L3.343 7.914a3 3 0 104.243 4.243l1.828-1.829A3 3
-.00 8.586 5.5l-.857-.857a1 1 0 00-1.414 1.414l.857.857a1 1 0 01-1.414 1.414l-1.828-1.829a1 1 0 010-1.414l1.829-1.828a1 1 0 011.414 0l.857.857a1 1 0 001.414-1.414l-.857-.857a3 3 0 00-4.242 0z"/>
+              <svg className="w-4 h-4 mr-2 text-gray-600" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M4.715 6.542L3.343 7.914a3 3 0 104.243 4.243l1.828-1.829A3 3 0 008.586 5.5l-.857-.857a1 1 0 00-1.414 1.414l.857.857a1 1 0 01-1.414 1.414l-1.828-1.829a1 1 0 010-1.414l1.829-1.828a1 1 0 011.414 0l.857.857a1 1 0 001.414-1.414l-.857-.857a3 3 0 00-4.242 0z"/>
                 <path d="M11.658 2.87c-.362 0-.724.138-1 .414l-1.828 1.829A3 3 0 107.086 8.3l.857.857a1 1 0 001.414-1.414l-.857-.857a1 1 0 011.414-1.414l1.828 1.829a1 1 0 010 1.414l-1.828 1.828a1 1 0 01-1.414 0l-.857-.857a1 1 0 00-1.414 1.414l.857.857a3 3 0 004.243 0l1.828-1.828A3 3 0 0011.657 2.87z"/>
               </svg>
               <a 
                 href={user.blog.startsWith('http') ? user.blog : `https://${user.blog}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
+                className="text-blue-500 hover:underline truncate max-w-[200px]"
               >
                 {user.blog}
               </a>
@@ -64,7 +79,7 @@ const UserProfile = ({ user }) => {
           
           {user.twitter_username && (
             <div className="flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 16 16">
+              <svg className="w-4 h-4 mr-2 text-gray-600" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M5.026 15c6.038 0 9.341-5.003 9.341-9.334 0-.14 0-.282-.006-.422A6.685 6.685 0 0016 3.542a6.658 6.658 0 01-1.889.518 3.301 3.301 0 001.447-1.817 6.533 6.533 0 01-2.087.793A3.286 3.286 0 007.875 6.03a9.325 9.325 0 01-6.767-3.429 3.289 3.289 0 001.018 4.382A3.323 3.323 0 01.64 6.575v.045a3.288 3.288 0 002.632 3.218 3.203 3.203 0 01-.865.115 3.23 3.23 0 01-.614-.057 3.283 3.283 0 003.067 2.277A6.588 6.588 0 01.78 13.58a6.32 6.32 0 01-.78-.045A9.344 9.344 0 005.026 15z"/>
               </svg>
               <a 
@@ -77,6 +92,27 @@ const UserProfile = ({ user }) => {
               </a>
             </div>
           )}
+          
+          {user.email && (
+            <div className="flex items-center">
+              <svg className="w-4 h-4 mr-2 text-gray-600" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/>
+              </svg>
+              <a 
+                href={`mailto:${user.email}`}
+                className="text-blue-500 hover:underline"
+              >
+                {user.email}
+              </a>
+            </div>
+          )}
+          
+          <div className="flex items-center pt-1">
+            <svg className="w-4 h-4 mr-2 text-gray-600" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M4 .5a.5.5 0 0 0-1 0V1H2a2 2 0 0 0-2 2v1h16V3a2 2 0 0 0-2-2h-1V.5a.5.5 0 0 0-1 0V1H4V.5zM16 14V5H0v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2zM2.5 8a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+            <span className="text-gray-600">Joined {formatDate(user.created_at)}</span>
+          </div>
         </div>
       </div>
       

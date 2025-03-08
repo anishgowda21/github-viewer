@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import axios from 'axios'
-import UserProfile from '../components/UserProfile'
-import SearchForm from '../components/SearchForm'
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
+import UserProfile from "../components/UserProfile";
+import SearchForm from "../components/SearchForm";
 
 // Custom debounce implementation
 const useDebounce = (value, delay) => {
@@ -22,24 +22,26 @@ const useDebounce = (value, delay) => {
 };
 
 const UserProfilePage = () => {
-  const navigate = useNavigate()
-  const { username: urlUsername } = useParams()
-  
-  const [username, setUsername] = useState(urlUsername || '')
-  const [user, setUser] = useState(null)
-  const [repos, setRepos] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [showAllRepos, setShowAllRepos] = useState(false)
-  
+  const navigate = useNavigate();
+  const { username: urlUsername } = useParams();
+
+  const [username, setUsername] = useState(urlUsername || "");
+  const [user, setUser] = useState(null);
+  const [repos, setRepos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showAllRepos, setShowAllRepos] = useState(false);
+  const [isSearchingGlobally, setIsSearchingGlobally] = useState(false);
+  const [globalSearchResults, setGlobalSearchResults] = useState(null);
+
   // Initial display limit
   const initialReposLimit = 6;
-  
+
   // Use our custom debounce hook
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  
+
   // Effect for search loading indicator
   useEffect(() => {
     if (searchTerm !== debouncedSearchTerm) {
@@ -48,114 +50,161 @@ const UserProfilePage = () => {
       setSearchLoading(false);
     }
   }, [searchTerm, debouncedSearchTerm]);
-  
+
   const fetchUserData = async (username) => {
-    if (!username.trim()) return
-    
-    setLoading(true)
-    setError(null)
-    
+    if (!username.trim()) return;
+
+    setLoading(true);
+    setError(null);
+
     try {
       const [userResponse, reposResponse] = await Promise.all([
         axios.get(`https://api.github.com/users/${username}`),
-        axios.get(`https://api.github.com/users/${username}/repos?sort=updated&per_page=100`)
-      ])
-      
-      setUser(userResponse.data)
-      setRepos(reposResponse.data)
-      setShowAllRepos(false) // Reset when loading new user
-      
+        axios.get(
+          `https://api.github.com/users/${username}/repos?sort=updated&per_page=100`
+        ),
+      ]);
+
+      setUser(userResponse.data);
+      setRepos(reposResponse.data);
+      setShowAllRepos(false); // Reset when loading new user
+      setGlobalSearchResults(null); // Reset global search
+      setIsSearchingGlobally(false); // Reset global search status
+
       // Update URL without reloading the page
-      navigate(`/user/${username}`, { replace: true })
+      navigate(`/user/${username}`, { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Error fetching data')
-      setUser(null)
-      setRepos([])
+      setError(err.response?.data?.message || "Error fetching data");
+      setUser(null);
+      setRepos([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-  
+  };
+
   // Handle search input change
   const handleSearchChange = (e) => {
-    const value = e.target.value
-    setSearchTerm(value)
-    
+    const value = e.target.value;
+    setSearchTerm(value);
+
+    // Reset global search when input changes
+    if (globalSearchResults) {
+      setGlobalSearchResults(null);
+      setIsSearchingGlobally(false);
+    }
+
     // If user starts searching, show all repos
     if (value) {
-      setShowAllRepos(true)
+      setShowAllRepos(true);
     }
-  }
-  
+  };
+
+  // Handle global search button click
+  const handleGlobalSearch = async () => {
+    if (!searchTerm.trim() || !user) return;
+
+    setIsSearchingGlobally(true);
+
+    try {
+      const response = await axios.get(
+        `https://api.github.com/search/repositories?q=${encodeURIComponent(
+          searchTerm
+        )}+user:${user.login}`
+      );
+
+      setGlobalSearchResults(response.data.items);
+    } catch (err) {
+      console.error("Global search error:", err);
+      setGlobalSearchResults([]);
+    } finally {
+      setIsSearchingGlobally(false);
+    }
+  };
+
   // Toggle showing all repositories
   const toggleShowAllRepos = () => {
-    setShowAllRepos(prev => !prev)
-  }
-  
+    setShowAllRepos((prev) => !prev);
+  };
+
   // Filter repositories based on debounced search term
-  const filteredRepos = repos.filter(repo => {
-    if (!debouncedSearchTerm) return true
-    
-    const searchLower = debouncedSearchTerm.toLowerCase()
+  const filteredRepos = repos.filter((repo) => {
+    if (!debouncedSearchTerm) return true;
+
+    const searchLower = debouncedSearchTerm.toLowerCase();
     return (
       repo.name.toLowerCase().includes(searchLower) ||
-      (repo.description && repo.description.toLowerCase().includes(searchLower)) ||
+      (repo.description &&
+        repo.description.toLowerCase().includes(searchLower)) ||
       (repo.language && repo.language.toLowerCase().includes(searchLower))
-    )
-  })
-  
+    );
+  });
+
+  // Check if we have the maximum number of repos (likely has more)
+  const hasLikelyMoreRepos = repos.length === 100;
+
   // Determine which repos to display
-  const displayRepos = searchTerm ? filteredRepos : showAllRepos ? repos : repos.slice(0, initialReposLimit)
-  
+  const reposToDisplay =
+    globalSearchResults ||
+    (searchTerm
+      ? filteredRepos
+      : showAllRepos
+      ? repos
+      : repos.slice(0, initialReposLimit));
+
   const handleUserSearch = (newUsername) => {
-    setUsername(newUsername)
+    setUsername(newUsername);
     if (newUsername.trim()) {
-      fetchUserData(newUsername)
+      fetchUserData(newUsername);
     }
-  }
-  
+  };
+
   const handleRepoClick = (repo) => {
-    navigate(`/repo/${repo.owner.login}/${repo.name}`)
-  }
-  
+    navigate(`/repo/${repo.owner.login}/${repo.name}`);
+  };
+
   // Format date to a more readable format
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'short', day: 'numeric' }
-    return new Date(dateString).toLocaleDateString(undefined, options)
-  }
-  
+    const options = { year: "numeric", month: "short", day: "numeric" };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
   // Initial data fetch when component mounts or username changes
   useEffect(() => {
     if (urlUsername) {
-      setUsername(urlUsername)
-      fetchUserData(urlUsername)
+      setUsername(urlUsername);
+      fetchUserData(urlUsername);
     } else if (username) {
-      fetchUserData(username)
+      fetchUserData(username);
     } else {
       // Load default user
-      fetchUserData('github')
+      fetchUserData("github");
     }
-  }, [urlUsername])
-  
+  }, [urlUsername]);
+
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">GitHub Profile Viewer</h1>
-        
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
+          GitHub Profile Viewer
+        </h1>
+
         <SearchForm onSearch={handleUserSearch} initialValue={username} />
-        
+
         {loading && (
           <div className="flex justify-center my-8">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         )}
-        
+
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded my-4" role="alert">
+          <div
+            className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded my-4"
+            role="alert"
+          >
             <p>{error}</p>
           </div>
         )}
-        
+
         {user && !loading && (
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-1">
@@ -165,44 +214,95 @@ const UserProfilePage = () => {
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Repositories ({repos.length})</h3>
-                    {repos.length > initialReposLimit && !searchTerm && (
-                      <button 
-                        onClick={toggleShowAllRepos}
-                        className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium focus:outline-none"
-                      >
-                        {showAllRepos ? 'Show less' : `Show all (${repos.length})`}
-                      </button>
-                    )}
+                    <h3 className="text-lg font-semibold">
+                      Repositories ({user.public_repos})
+                    </h3>
+                    {repos.length > initialReposLimit &&
+                      !searchTerm &&
+                      !globalSearchResults && (
+                        <button
+                          onClick={toggleShowAllRepos}
+                          className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium focus:outline-none"
+                        >
+                          {showAllRepos
+                            ? "Show less"
+                            : `Show ${hasLikelyMoreRepos ? "recent" : "all"} ${
+                                repos.length
+                              }`}
+                        </button>
+                      )}
                   </div>
-                  <div className="relative">
+                  <div className="relative flex items-center w-full sm:w-auto">
                     <input
                       type="text"
                       placeholder="Search repositories..."
                       value={searchTerm}
                       onChange={handleSearchChange}
-                      className="pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
+                      className="pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 sm:w-64"
                     />
-                    <svg className="w-5 h-5 text-gray-400 absolute left-2 top-2.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                    <svg
+                      className="w-5 h-5 text-gray-400 absolute left-2 top-2.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                     {searchLoading && (
-                      <div className="absolute right-2 top-2.5">
+                      <div className="absolute right-20 sm:right-24 top-2.5">
                         <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"></div>
                       </div>
                     )}
+
+                    {searchTerm && (
+                      <button
+                        onClick={handleGlobalSearch}
+                        disabled={isSearchingGlobally}
+                        className={`ml-2 px-3 py-2 text-white rounded ${
+                          isSearchingGlobally
+                            ? "bg-blue-400 cursor-not-allowed"
+                            : "bg-blue-500 hover:bg-blue-600"
+                        }`}
+                      >
+                        {isSearchingGlobally ? (
+                          <div className="h-5 w-5 border-t-2 border-b-2 border-white rounded-full animate-spin"></div>
+                        ) : (
+                          "Search"
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
-                
-                {displayRepos.length === 0 ? (
+
+                {searchTerm &&
+                  filteredRepos.length === 0 &&
+                  !globalSearchResults &&
+                  !isSearchingGlobally && (
+                    <div className="p-4 bg-yellow-50 text-yellow-700 text-sm border-b">
+                      No matching repositories found in recent repos.
+                      <button
+                        onClick={handleGlobalSearch}
+                        className="ml-2 underline font-medium"
+                      >
+                        Search all repositories
+                      </button>
+                    </div>
+                  )}
+
+                {reposToDisplay.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
-                    {searchTerm ? 'No repositories match your search.' : 'No repositories found.'}
+                    {searchTerm
+                      ? "No repositories match your search."
+                      : "No repositories found."}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                    {displayRepos.map(repo => (
-                      <div 
-                        key={repo.id} 
+                    {reposToDisplay.map((repo) => (
+                      <div
+                        key={repo.id}
                         className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 cursor-pointer"
                         onClick={() => handleRepoClick(repo)}
                       >
@@ -211,16 +311,18 @@ const UserProfilePage = () => {
                             {repo.name}
                           </h3>
                           {repo.fork && (
-                            <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">Fork</span>
+                            <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
+                              Fork
+                            </span>
                           )}
                         </div>
-                        
+
                         {repo.description && (
                           <p className="text-sm text-gray-600 mt-2 line-clamp-2">
                             {repo.description}
                           </p>
                         )}
-                        
+
                         <div className="mt-4 flex flex-wrap gap-2">
                           {repo.language && (
                             <div className="flex items-center text-xs text-gray-600">
@@ -228,33 +330,44 @@ const UserProfilePage = () => {
                               {repo.language}
                             </div>
                           )}
-                          
+
                           <div className="flex items-center text-xs text-gray-600 ml-3">
-                            <svg className="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 16 16">
-                              <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/>
+                            <svg
+                              className="w-3.5 h-3.5 mr-1"
+                              fill="currentColor"
+                              viewBox="0 0 16 16"
+                            >
+                              <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z" />
                             </svg>
                             {repo.stargazers_count}
                           </div>
-                          
+
                           <div className="flex items-center text-xs text-gray-600 ml-3">
-                            <svg className="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 16 16">
-                              <path fillRule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"/>
+                            <svg
+                              className="w-3.5 h-3.5 mr-1"
+                              fill="currentColor"
+                              viewBox="0 0 16 16"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"
+                              />
                             </svg>
                             {repo.forks_count}
                           </div>
-                          
+
                           <div className="flex-grow text-right">
                             <span className="text-xs text-gray-500">
                               Updated {formatDate(repo.updated_at)}
                             </span>
                           </div>
                         </div>
-                        
+
                         {repo.topics && repo.topics.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-1">
-                            {repo.topics.slice(0, 3).map(topic => (
-                              <span 
-                                key={topic} 
+                            {repo.topics.slice(0, 3).map((topic) => (
+                              <span
+                                key={topic}
                                 className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
                               >
                                 {topic}
@@ -271,16 +384,28 @@ const UserProfilePage = () => {
                     ))}
                   </div>
                 )}
-                
+
                 {/* Show message about limited display when needed */}
-                {!searchTerm && !showAllRepos && repos.length > initialReposLimit && (
-                  <div className="px-4 py-3 bg-gray-50 text-center">
-                    <button 
-                      onClick={toggleShowAllRepos}
-                      className="text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
-                    >
-                      Show all {repos.length} repositories
-                    </button>
+                {!searchTerm &&
+                  !showAllRepos &&
+                  repos.length > initialReposLimit &&
+                  !globalSearchResults && (
+                    <div className="px-4 py-3 bg-gray-50 text-center">
+                      <button
+                        onClick={toggleShowAllRepos}
+                        className="text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
+                      >
+                        Show {hasLikelyMoreRepos ? "recent" : "all"}{" "}
+                        {repos.length} repositories
+                      </button>
+                    </div>
+                  )}
+
+                {/* Show message about limited search if we have 100 repos */}
+                {hasLikelyMoreRepos && !globalSearchResults && (
+                  <div className="px-4 py-2 bg-gray-50 text-gray-600 text-xs text-center border-t">
+                    Showing only the 100 most recent repositories. Use the
+                    search button for more comprehensive results.
                   </div>
                 )}
               </div>
@@ -289,7 +414,7 @@ const UserProfilePage = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default UserProfilePage
+export default UserProfilePage;
